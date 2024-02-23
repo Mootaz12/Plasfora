@@ -14,7 +14,7 @@ export class AuthController {
     return this.authService.signin(dto);
   }
   @Post('forgetPassword')
-  forgetPassword(@Body() dto: ForgotPasswordDto) {
+  forgetPassword(@Body() dto: forgetPasswordDto) {
     return this.authService.forgetPassword(dto);
   }
 }

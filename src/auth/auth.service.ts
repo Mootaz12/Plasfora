@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Redirect } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { SignUpDto, SignInDto, forgetPasswordDto } from './dto';
 import User from '../schemas/user.schema';
@@ -43,11 +43,19 @@ export class AuthService {
         (await User.findOne({ email: dto.loginIdentifier })) ||
         (await User.findOne({ phoneNumber: dto.loginIdentifier }));
       if (user && (await bcrypt.compare(dto.password, user.password))) {
-        return this.signToken(
+        const token = await this.signToken(
           user._id.toString(),
           user.email,
           user.phoneNumber,
         );
+
+        return {
+          fullname: user.fullname,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+          token: token,
+        };
       } else {
         return { msg: 'wrong credentials' };
       }
@@ -71,5 +79,18 @@ export class AuthService {
       secret: this.config.get('JWT_SECRET'),
     });
   }
-  forgetPassword(tdo: forgetPasswordDto) {}
+  async forgetPassword(tdo: forgetPasswordDto) {
+    try {
+      if (
+        (await User.findOne({ email: tdo.email })) &&
+        (await User.findOne({
+          phoneNumber: tdo.phoneNumber,
+        }))
+      ) {
+        // Redirect('foretPassword');
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
 }
