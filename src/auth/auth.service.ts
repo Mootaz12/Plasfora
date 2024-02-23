@@ -1,25 +1,31 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { AuthDto } from './dto';
+import { SignUpDto, SignInDto, forgetPasswordDto } from './dto';
 import User from '../schemas/user.schema';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
-  async signup(dto: AuthDto) {
+  constructor(
+    private config: ConfigService,
+    private jwt: JwtService,
+  ) {}
+  async signup(dto: SignUpDto) {
     try {
-      const existingUser = await User.findOne({ email: dto.email });
-      if (existingUser) {
+      if (await User.findOne({ email: dto.email })) {
         return { msg: 'email already exists' };
       }
-
-      const hashedPassword = await bcrypt.hash(dto.password, 10);
+      if (await User.findOne({ phoneNumber: dto.phoneNumber })) {
+        return { msg: 'phone number already exists' };
+      }
 
       const user = new User({
         fullname: dto.fullname,
         email: dto.email,
-        password: hashedPassword,
+        password: await bcrypt.hash(dto.password, 10),
         phoneNumber: dto.phoneNumber,
-        role: ['client'],
+        role: dto.role && dto.role.length > 0 ? dto.role : ['Patient'],
       });
 
       await user.save();
@@ -31,13 +37,17 @@ export class AuthService {
     }
   }
 
-  async signin(dto: AuthDto) {
+  async signin(dto: SignInDto) {
     try {
       const user =
-        (await User.findOne({ email: dto })) ||
-        (await User.findOne({ phoneNumber: dto.phoneNumber }));
+        (await User.findOne({ email: dto.loginIdentifier })) ||
+        (await User.findOne({ phoneNumber: dto.loginIdentifier }));
       if (user && (await bcrypt.compare(dto.password, user.password))) {
-        return { msg: 'signin' };
+        return this.signToken(
+          user._id.toString(),
+          user.email,
+          user.phoneNumber,
+        );
       } else {
         return { msg: 'wrong credentials' };
       }
@@ -46,4 +56,20 @@ export class AuthService {
       throw error;
     }
   }
+  signToken(
+    userId: String,
+    email: String,
+    phoneNumber: String,
+  ): Promise<String> {
+    const payload = {
+      sub: userId,
+      email,
+      phoneNumber,
+    };
+    return this.jwt.signAsync(payload, {
+      expiresIn: '10h',
+      secret: this.config.get('JWT_SECRET'),
+    });
+  }
+  forgetPassword(tdo: forgetPasswordDto) {}
 }
